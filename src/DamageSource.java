@@ -1,3 +1,5 @@
+import java.util.HashMap;
+
 public class DamageSource {
 
     private int str = 0;
@@ -16,6 +18,8 @@ public class DamageSource {
     private boolean isCrisis = false;
     private double crisisModifier = 1.0;
     private int buffCount = 0;
+
+    private HashMap<String, BuffCount> buffCountMap = new HashMap<>();
 
     private boolean isDragonSkill = false;
     private static final int BASE_DRAGON_DAMAGE = 70;
@@ -41,14 +45,22 @@ public class DamageSource {
     private int critDmgDoublebuff = 0;
     private boolean regenDoublebuff = false;
     private boolean energyDoublebuff = false;
+    
+    private int damageUp = 0;
 
     String title;
 
     int energyStacks = 0;
 
-    private enum Buff{PATIA, YUYA, SCLEO_SELF, SCLEO_ALLY, DEF, DYXAIN};
+    private boolean toPrintDetails = false;
+
+    private enum Buff{PATIA, YUYA, SCLEO_SELF, SCLEO_ALLY, DEF, DYXAIN, SYLAS, REGEN, GLUCA, PSIREN, DOUBLEBUFF};
 
     public DamageSource(){}
+
+    public DamageSource(int lol){
+        toPrintDetails = true;
+    }
 
     public DamageSource applyTitle(String title){
         this.title = title;
@@ -80,8 +92,8 @@ public class DamageSource {
         return this;
     }
 
-    public DamageSource applyDragonDmg(boolean isDragonSkill, int dragonDamage){
-        this.isDragonSkill = isDragonSkill;
+    public DamageSource applyDragonDmg(int dragonDamage){
+        this.isDragonSkill = true;
         this.dragonDamage = dragonDamage;
         return this;
     }
@@ -110,6 +122,11 @@ public class DamageSource {
 
     public DamageSource applyElementDmg(int value){
         this.elementDamage = value;
+        return this;
+    }
+
+    public DamageSource applyDamageUp(int value){
+        this.damageUp = value;
         return this;
     }
 
@@ -155,8 +172,33 @@ public class DamageSource {
                 buffCount += count;
             }
             case DYXAIN -> {
+                critRate += 22 * count;
                 buffStr += 5 * count;
                 buffCount += 2 * count;
+            }
+            case SYLAS -> {
+                buffStr += 25 * count;
+                outDef = true;
+                buffCount += 3 * count + (Math.min(count, 2));
+            }
+            case REGEN -> {
+                buffCount += count;
+            }
+            case GLUCA -> {
+                buffCd += 80 * count;
+                buffCount += count;
+            }
+            case PSIREN -> {
+                buffStr += 20 * count;
+                outDef = true;
+                if(energyStacks == 0){
+                    buffCount++;
+                }
+                energyStacks += 3 * count;
+                energyStacks = Math.min(energyStacks, 5);
+            }
+            case DOUBLEBUFF -> {
+                outDef = true;
             }
         }
         if(outDef){
@@ -219,50 +261,146 @@ public class DamageSource {
         double finalCd = 1.0 + (0.01*BASE_CRIT_DAMAGE) + (0.01*coabCd) + (0.01*buffCd) + (0.01*passiveCd);
         double finalPunisher = 1.0 + (0.01*punisherSum);
         double finalDef = def * (1.0 - 0.01*defDown);
-        double finalSDMod = 0.01 * (skillMod * (isSkillShare ? 0.7 : 1.0) * (isXanderArchetype ? (1.0 + 0.05*buffCount) : 1.0) * (isDragonSkill ? (1.0 + 0.01*(BASE_DRAGON_DAMAGE + dragonDamage)) : 1.0) * (isCrisis ? crisisModifier : 1.0));
+        double finalSDMod = 0.01 * (skillMod * (isSkillShare ? 0.7 : 1.0)
+                * (isXanderArchetype ? (1.0 + 0.05*buffCount) : 1.0)
+                * (isDragonSkill ? (1.0 + 0.01*(BASE_DRAGON_DAMAGE + dragonDamage)) : 1.0)
+                * (isCrisis ? crisisModifier : 1.0));
         double finalElementDamage = 1.0 + ((0.01) * (ON_ELEMENT_BONUS + elementDamage));
+        double finalDamageUp = 1.0 + 0.01 * damageUp;
 
         if(title != null){
             System.out.println(title);
         }
-        System.out.println("Final Strength: " + round(finalStr) + " (Base: " + str + ", Coab: " + coabStr + ", Buff: " + effectiveBuffStr + ", Passive: " + passiveStr + ")");
-        System.out.println("Final Skill Damage: " + round(finalSD) + " (Coab: " + coabSd + ", Buff: " + buffSd + ", Passive: " + effectivePassiveSd + ")");
-        System.out.println("Final Crit Damage: " + round(finalCd) + " (Base: 70, Coab: " + coabCd + ", Buff: " + buffCd + ", Passive: " + passiveCd + ", Crit Rate: " + critRate + "%)");
-        System.out.println("Final Punisher: " + finalPunisher);
-        System.out.println("Final Def: " + finalDef);
-        System.out.print("Final Skill Modifier: " + round(finalSDMod));
-        if(isSkillShare){
-            System.out.print(" [Skill Share Modifier: 0.7]");
+        if(toPrintDetails){
+            System.out.println("Final Strength: " + round(finalStr) + " (Base: " + str + ", Coab: " + coabStr + ", Buff: " + effectiveBuffStr + ", Passive: " + passiveStr + ")");
+            System.out.println("Final Skill Damage: " + round(finalSD) + " (Coab: " + coabSd + ", Buff: " + buffSd + ", Passive: " + effectivePassiveSd + ")");
+            System.out.println("Final Crit Damage: " + round(finalCd) + " (Base: 70, Coab: " + coabCd + ", Buff: " + buffCd + ", Passive: " + passiveCd + ", Crit Rate: " + critRate + "%)");
+            System.out.println("Final Punisher: " + finalPunisher);
+            System.out.println("Final Def: " + finalDef);
+            System.out.print("Final Skill Modifier: " + round(finalSDMod) + " [Base Modifier: " + skillMod + "%]");
+            if(isSkillShare){
+                System.out.print(" [Skill Share Modifier: 0.7]");
+            }
+            if(isXanderArchetype){
+                System.out.print(" [Buff Count: " + buffCount + "]");
+            }
+            if(isDragonSkill){
+                System.out.print(" [Dragon Damage: " + dragonDamage + "]");
+            }
+            if(isCrisis){
+                System.out.print(" [Crisis Modifier: " + crisisModifier + "]");
+            }
+            System.out.println();
+            System.out.println("Final Element Damage: " + round(finalElementDamage));
+            System.out.println("Damage Up: " + finalDamageUp);
         }
-        if(isXanderArchetype){
-            System.out.print(" [Base Modifier: " + skillMod + "%] [Buff Count: " + buffCount + "]");
-        }
-        if(isCrisis){
-            System.out.print(" [Crisis Modifier: " + crisisModifier + "]");
-        }
-        System.out.println();
-        System.out.println("Final Element Damage: " + finalElementDamage);
 
-        double result = (miscModifier * (5.0/3.0) * (1.0 * finalStr * finalSDMod * finalSD * finalCd * finalPunisher * finalElementDamage) / finalDef);
+        double result = (miscModifier * (5.0/3.0) * (1.0 * finalStr * finalSDMod * finalSD * finalCd * finalPunisher * finalElementDamage * finalDamageUp) / finalDef);
         System.out.println("Expected Damage: " + intToString((int)result) + ", No Crit: " + intToString((int)(result / finalCd)));
         System.out.println("Damage Range: " + intToString((int)(result*0.95)) + " - " + intToString((int)(result*1.05)));
         System.out.println();
     }
 
     public static void main(String[] args){
-        new DamageSource()
-                .applyTitle("Hawk")
-                .applyStr(5325, 10, 0, 70)
-                .applySkd(15, 0, 40)
-                .applySkill(1667, true, true, false, 1.0, 3)
-                .applyCritRate(14)
-                .applyElementDmg(30+20)
-                .applyDoublebuffs(13, 15, false, true)
-                .applyBuff(Buff.PATIA, 3 + 2)
-                .applyBuff(Buff.SCLEO_ALLY, 1 + 1)
-                .applyBuff(Buff.DYXAIN, 1)
+        //4 cca, 1 regen, 1 od, 1 energy, 5 thope
+        new DamageSource(1)
+                .applyTitle("Mari P1 Xander")
+                .applyStr(5300, 10, 0, 100+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 7 + 5)
+                .applyCritRate(13)
+                .applyElementDmg(20)
                 .applyAmpStr(20)
+                .applyPunisher(15+30)
+                .applyDefDown(5)
+                .applyDoublebuffs(10, 15, false, false)
+                .applyBuff(Buff.PATIA, 4)
+                .applyBuff(Buff.DYXAIN, 1)
+                .applyBuff(Buff.SCLEO_ALLY, 2)
+                .applyBuff(Buff.SCLEO_SELF, 1)
                 .print();
+        //3 cca, 2 regen, 1 od, 1 energy, 4 thope
+        new DamageSource(1)
+                .applyTitle("shart P2 Xander")
+                .applyStr(5300, 10, 0, 100+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 7 + 5 + 4)
+                .applyCritRate(13)
+                .applyElementDmg(20)
+                .applyAmpStr(20)
+                .applyPunisher(30+55)
+                .applyDoublebuffs(10, 15, false, false)
+                .applyBuff(Buff.PATIA, 4 + 3)
+                .applyBuff(Buff.DYXAIN, 1 + 1)
+                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
+                .applyBuff(Buff.SCLEO_SELF, 2)
+                .print();
+        new DamageSource(1)
+                .applyTitle("Goomba P1 Xander")
+                .applyStr(5300, 10, 0, 70+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 7 + 6)
+                .applyCritRate(13)
+                .applyElementDmg(20+30)
+                .applyAmpStr(20)
+                .applyDefDown(5)
+                .applyDoublebuffs(10, 15, true, false)
+                .applyBuff(Buff.PATIA, 4)
+                .applyBuff(Buff.DEF, 1)
+                .applyBuff(Buff.DYXAIN, 1)
+                .applyBuff(Buff.SCLEO_ALLY, 2)
+                .applyBuff(Buff.SCLEO_SELF, 1)
+                .print();
+        new DamageSource(1)
+                .applyTitle("Goomba P2 Xander")
+                .applyStr(5300, 10, 0, 70+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 7 + 6)
+                .applyCritRate(13)
+                .applyPunisher(15)
+                .applyElementDmg(20+30)
+                .applyAmpStr(20 + 20)
+                .applyDefDown(10)
+                .applyDoublebuffs(10, 15, true, false)
+                .applyBuff(Buff.PATIA, 4 + 3)
+                .applyBuff(Buff.DEF, 1 + 1)
+                .applyBuff(Buff.DYXAIN, 1 + 1)
+                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
+                .applyBuff(Buff.SCLEO_SELF, 1 + 1)
+                .print();
+        /*
+        DamageSource a = new DamageSource(1)
+                .applyTitle("Mari P1 Xander")
+                .applyStr(5300, 10, 0, 100+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 6 + 5)
+                .applyCritRate(13)
+                .applyElementDmg(20)
+                .applyAmpStr(20)
+                .applyPunisher(15+30)
+                .applyDefDown(5)
+                .applyDoublebuffs(10, 15, false, false)
+                .applyBuff(Buff.PATIA, 4)
+                .applyBuff(Buff.DYXAIN, 1)
+                .applyBuff(Buff.SCLEO_ALLY, 2)
+                .applyBuff(Buff.SCLEO_SELF, 1);
+        a.print();
+        DamageSource b = new DamageSource(1)
+                .applyTitle("Mari P2 Xander")
+                .applyStr(5300, 10, 0, 100+20)
+                .applySkd(15, 0, 40+45+50)
+                .applySkill(1667, true, true, false, 1.0, 5 + 9)
+                .applyCritRate(13)
+                .applyElementDmg(20)
+                .applyAmpStr(20)
+                .applyPunisher(30+55)
+                .applyDoublebuffs(10, 15, true, false)
+                .applyBuff(Buff.PATIA, 4 + 3)
+                .applyBuff(Buff.DYXAIN, 1 + 1)
+                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
+                .applyBuff(Buff.SCLEO_SELF, 0 + 1)
+                .applyBuff(Buff.DOUBLEBUFF, 1);
+        b.print(); */
     }
 
 
