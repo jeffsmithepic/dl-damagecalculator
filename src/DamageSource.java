@@ -54,7 +54,10 @@ public class DamageSource {
 
     private boolean toPrintDetails = false;
 
-    private enum Buff{PATIA, YUYA, SCLEO_SELF, SCLEO_ALLY, DEF, DYXAIN, SYLAS, REGEN, GLUCA, PSIREN, DOUBLEBUFF};
+    private enum Buff {PATIA, YUYA, SCLEO_SELF, SCLEO_ALLY, DEF, DYXAIN, SYLAS, REGEN, GLUCA, PSIREN, DOUBLEBUFF, YUE,
+    STR10, STR50, MITSUBA};
+
+    private enum Stat {STR, SKD};
 
     public DamageSource(){}
 
@@ -89,6 +92,31 @@ public class DamageSource {
         this.isCrisis = isCrisis;
         this.crisisModifier = crisisMod;
         this.buffCount = buffCount;
+        return this;
+    }
+
+    public DamageSource applyDragonSkill(int skillMod, int dragonDamage){
+        this.skillMod = skillMod;
+        this.isDragonSkill = true;
+        this.dragonDamage = dragonDamage;
+        return this;
+    }
+
+    public DamageSource applyXanderSS(int buffCount){
+        this.skillMod = 1667;
+        this.isSkillShare = true;
+        this.isXanderArchetype = true;
+        this.buffCount = buffCount;
+        return this;
+    }
+
+    public DamageSource applyXanderSS(int buffCount, double crisisMod){
+        this.skillMod = 1667;
+        this.isSkillShare = true;
+        this.isXanderArchetype = true;
+        this.buffCount = buffCount;
+        this.isCrisis = true;
+        this.crisisModifier = crisisMod;
         return this;
     }
 
@@ -138,8 +166,25 @@ public class DamageSource {
         return this;
     }
 
-    public DamageSource applyBuff(Buff buff){
-        return applyBuff(buff, 1);
+    public DamageSource applyStrBuff(int value, int count){
+        buffStr += value * count;
+        buffCount += count;
+        return this;
+    }
+
+    public DamageSource applyBuff(Stat buff, int value, int count){
+        int product = value * count;
+        switch(buff){
+            case STR -> buffStr += product;
+            case SKD -> buffSd += product;
+        }
+        buffCount += count;
+        return this;
+    }
+
+    public DamageSource applyDefChange(double value){
+        def *= value;
+        return this;
     }
 
     public DamageSource applyBuff(Buff buff, int count){
@@ -197,8 +242,20 @@ public class DamageSource {
                 energyStacks += 3 * count;
                 energyStacks = Math.min(energyStacks, 5);
             }
+            case YUE -> {
+                critRate += 30;
+                buffCount += 1;
+            }
             case DOUBLEBUFF -> {
                 outDef = true;
+            }
+            case MITSUBA -> {
+                buffCd += 50 * count;
+                buffCount += count;
+            }
+            case STR10 -> {
+                buffStr += 10 * count;
+                buffCount += count;
             }
         }
         if(outDef){
@@ -231,6 +288,15 @@ public class DamageSource {
     public DamageSource applyAmpStr(int value){
         this.ampStr = value;
         return this;
+    }
+
+    public DamageSource applyMultiplier(double value){
+        this.miscModifier = value;
+        return this;
+    }
+
+    public static double getCrisisModifier(double value, double hpLeft){
+        return Math.pow(1.0 - hpLeft, 2.0) * (value - 1.0) + 1.0;
     }
 
     private static String intToString(int in){
@@ -274,7 +340,7 @@ public class DamageSource {
         if(toPrintDetails){
             System.out.println("Final Strength: " + round(finalStr) + " (Base: " + str + ", Coab: " + coabStr + ", Buff: " + effectiveBuffStr + ", Passive: " + passiveStr + ")");
             System.out.println("Final Skill Damage: " + round(finalSD) + " (Coab: " + coabSd + ", Buff: " + buffSd + ", Passive: " + effectivePassiveSd + ")");
-            System.out.println("Final Crit Damage: " + round(finalCd) + " (Base: 70, Coab: " + coabCd + ", Buff: " + buffCd + ", Passive: " + passiveCd + ", Crit Rate: " + critRate + "%)");
+            System.out.println("Final Crit Damage: " + round(finalCd) + " (Base: 70, Coab: " + coabCd + ", Buff: " + buffCd + ", Passive: " + passiveCd + ", Crit Rate: " + Math.min(100,critRate) + "%)");
             System.out.println("Final Punisher: " + finalPunisher);
             System.out.println("Final Def: " + finalDef);
             System.out.print("Final Skill Modifier: " + round(finalSDMod) + " [Base Modifier: " + skillMod + "%]");
@@ -293,6 +359,7 @@ public class DamageSource {
             System.out.println();
             System.out.println("Final Element Damage: " + round(finalElementDamage));
             System.out.println("Damage Up: " + finalDamageUp);
+            System.out.println("Other Multipliers: " + miscModifier);
         }
 
         double result = (miscModifier * (5.0/3.0) * (1.0 * finalStr * finalSDMod * finalSD * finalCd * finalPunisher * finalElementDamage * finalDamageUp) / finalDef);
@@ -302,105 +369,24 @@ public class DamageSource {
     }
 
     public static void main(String[] args){
-        //4 cca, 1 regen, 1 od, 1 energy, 5 thope
+
         new DamageSource(1)
-                .applyTitle("Mari P1 Xander")
-                .applyStr(5300, 10, 0, 100+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 7 + 5)
-                .applyCritRate(13)
-                .applyElementDmg(20)
-                .applyAmpStr(20)
-                .applyPunisher(15+30)
-                .applyDefDown(5)
+                .applyTitle("balls")
+                .applyStr(5300, 10, 15, 100+20)
+                .applySkd(15, 30, 40)
+                .applyCritDmg(30, 0, 20)
+                .applyPunisher(30)
+                .applySkill(2800, false, false, true, getCrisisModifier(1.6, 0.15), 0)
+                .applyDragonDmg(0)
+                .applyCritRate(100)
                 .applyDoublebuffs(10, 15, false, false)
-                .applyBuff(Buff.PATIA, 4)
-                .applyBuff(Buff.DYXAIN, 1)
-                .applyBuff(Buff.SCLEO_ALLY, 2)
-                .applyBuff(Buff.SCLEO_SELF, 1)
+                .applyBuff(Buff.PATIA, 6)
+                .applyBuff(Buff.SCLEO_ALLY, 1)
+                .applyBuff(Stat.STR, 30, 1)
+                .applyDefDown(40)
+                .applyMultiplier(1.5)
+                .applyDamageUp(15)
                 .print();
-        //3 cca, 2 regen, 1 od, 1 energy, 4 thope
-        new DamageSource(1)
-                .applyTitle("shart P2 Xander")
-                .applyStr(5300, 10, 0, 100+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 7 + 5 + 4)
-                .applyCritRate(13)
-                .applyElementDmg(20)
-                .applyAmpStr(20)
-                .applyPunisher(30+55)
-                .applyDoublebuffs(10, 15, false, false)
-                .applyBuff(Buff.PATIA, 4 + 3)
-                .applyBuff(Buff.DYXAIN, 1 + 1)
-                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
-                .applyBuff(Buff.SCLEO_SELF, 2)
-                .print();
-        new DamageSource(1)
-                .applyTitle("Goomba P1 Xander")
-                .applyStr(5300, 10, 0, 70+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 7 + 6)
-                .applyCritRate(13)
-                .applyElementDmg(20+30)
-                .applyAmpStr(20)
-                .applyDefDown(5)
-                .applyDoublebuffs(10, 15, true, false)
-                .applyBuff(Buff.PATIA, 4)
-                .applyBuff(Buff.DEF, 1)
-                .applyBuff(Buff.DYXAIN, 1)
-                .applyBuff(Buff.SCLEO_ALLY, 2)
-                .applyBuff(Buff.SCLEO_SELF, 1)
-                .print();
-        new DamageSource(1)
-                .applyTitle("Goomba P2 Xander")
-                .applyStr(5300, 10, 0, 70+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 7 + 6)
-                .applyCritRate(13)
-                .applyPunisher(15)
-                .applyElementDmg(20+30)
-                .applyAmpStr(20 + 20)
-                .applyDefDown(10)
-                .applyDoublebuffs(10, 15, true, false)
-                .applyBuff(Buff.PATIA, 4 + 3)
-                .applyBuff(Buff.DEF, 1 + 1)
-                .applyBuff(Buff.DYXAIN, 1 + 1)
-                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
-                .applyBuff(Buff.SCLEO_SELF, 1 + 1)
-                .print();
-        /*
-        DamageSource a = new DamageSource(1)
-                .applyTitle("Mari P1 Xander")
-                .applyStr(5300, 10, 0, 100+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 6 + 5)
-                .applyCritRate(13)
-                .applyElementDmg(20)
-                .applyAmpStr(20)
-                .applyPunisher(15+30)
-                .applyDefDown(5)
-                .applyDoublebuffs(10, 15, false, false)
-                .applyBuff(Buff.PATIA, 4)
-                .applyBuff(Buff.DYXAIN, 1)
-                .applyBuff(Buff.SCLEO_ALLY, 2)
-                .applyBuff(Buff.SCLEO_SELF, 1);
-        a.print();
-        DamageSource b = new DamageSource(1)
-                .applyTitle("Mari P2 Xander")
-                .applyStr(5300, 10, 0, 100+20)
-                .applySkd(15, 0, 40+45+50)
-                .applySkill(1667, true, true, false, 1.0, 5 + 9)
-                .applyCritRate(13)
-                .applyElementDmg(20)
-                .applyAmpStr(20)
-                .applyPunisher(30+55)
-                .applyDoublebuffs(10, 15, true, false)
-                .applyBuff(Buff.PATIA, 4 + 3)
-                .applyBuff(Buff.DYXAIN, 1 + 1)
-                .applyBuff(Buff.SCLEO_ALLY, 1 + 2)
-                .applyBuff(Buff.SCLEO_SELF, 0 + 1)
-                .applyBuff(Buff.DOUBLEBUFF, 1);
-        b.print(); */
     }
 
 
